@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: "mongo:6.0"
+    volumes:
+      - "mongodb_data:/data/db"
+    restart: "on-failure"
+
+  opensearch:
+    image: "opensearchproject/opensearch:2.19.1"
+    environment:
+      - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "bootstrap.memory_lock=true"
+      - "discovery.type=single-node"
+      - "action.auto_create_index=false"
+      - "plugins.security.ssl.http.enabled=false"
+      - "plugins.security.disabled=true"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}"
+    ulimits:
+      memlock:
+        hard: -1
+        soft: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - "os_data:/usr/share/opensearch/data"
+    restart: "on-failure"
+
+  graylog:
+    hostname: "graylog"
+    image: "graylog/graylog:6.1"
+    entrypoint: "/usr/bin/tini -- wait-for-it opensearch:9200 --  /docker-entrypoint.sh"
+    environment:
+      GRAYLOG_PASSWORD_SECRET: "${GRAYLOG_PASSWORD_SECRET}"
+      GRAYLOG_ROOT_PASSWORD_SHA2: "${GRAYLOG_ROOT_PASSWORD_SHA2}"
+      GRAYLOG_HTTP_EXTERNAL_URI: "http://10.99.99.11:9000/"
+      GRAYLOG_MONGODB_URI: "mongodb://mongodb:27017/graylog"
+      GRAYLOG_ENABLE_PREFLIGHT_WEB: "false"
+      GRAYLOG_ELASTICSEARCH_HOSTS: "http://opensearch:9200"
+      GRAYLOG_ROOT_TIMEZONE: "Asia/Phnom_Penh"
+      TZ: "Asia/Phnom_Penh"
+    ports:
+      - "5044:5044/tcp"
+      - "5140:5140/udp"
+      - "5140:5140/tcp"
+      - "514:514/udp"
+      - "514:514/tcp"
+      - "9000:9000/tcp"
+      - "12201:12201/tcp"
+      - "12201:12201/udp"
+      - "13301:13301/tcp"
+      - "13302:13302/tcp"
+    volumes:
+      - "graylog_data:/usr/share/graylog/data"
+    restart: "on-failure"
+    depends_on:
+      - "mongodb"
+      - "opensearch"
+
+volumes:
+  mongodb_data:
+  os_data:
+  graylog_data:
